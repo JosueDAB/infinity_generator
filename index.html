@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-  PHASE INFINITY — Generador de fases (versión 1.0)
+  PHASE INFINITY — Generador de fases (versión 1.1)
   ----------------------------------------------------------------------------
   Aplicación web de un solo archivo (HTML + CSS + JavaScript + SVG integrados)
   que genera fases infinitas para el juego de mesa Phase 10.
@@ -10,6 +10,20 @@
     1. <style>   Estilos, organizados por secciones
     2. <body>    Marcado: fondo, escenario (pantalla), ventanas emergentes
     3. <script>  Lógica, organizada por secciones numeradas
+
+  HISTORIAL DE CAMBIOS
+    v1.1  Adaptación a celulares (detalle completo en CAMBIOS.md):
+          - El escenario se escala según el área REAL visible (barra del navegador,
+            muescas y zonas seguras incluidas) usando el alto dinámico (100dvh).
+          - La orientación se detecta sola al girar el teléfono (el botón de
+            orientación sigue funcionando como cambio manual).
+          - Se bloquea el zoom por pellizco y el doble toque para que la pantalla
+            no se desplace ni se desajuste.
+          - Los efectos "hover" solo se activan en dispositivos con ratón (en
+            táctil se quedaban pegados tras tocar un botón).
+          - Ventanas emergentes (guía, historial, token) ajustadas al alto
+            disponible y sin desbordar el ancho en pantallas estrechas.
+    v1.0  Versión inicial.
 
   LEYENDA DE CLASES CSS CORTAS (se conservan por compatibilidad con los SVG)
     .g   botón generador de fases        .t    botón de la barra de herramientas
@@ -21,7 +35,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Phase Infinity</title>
 <!-- Favicon: estrellita blanca de 4 puntas (como las estrellas del fondo) sobre fondo azul oscuro para que se vea en cualquier pestaña -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23070026'/%3E%3Cpath fill='%23fff' d='M32 8Q35 29 56 32Q35 35 32 56Q29 35 8 32Q29 29 32 8Z'/%3E%3C/svg%3E">
@@ -32,12 +46,20 @@
 :root{
   --page:#c8c8c8;                                   /* color de página (modo claro) */
   box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px);         /* respeta las zonas seguras de móviles */
+  /* Zonas seguras de móviles (muescas, barra de gestos). JavaScript las lee de aquí
+     para centrar el escenario únicamente en el área realmente utilizable. */
+  padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px);
+  padding-right:env(safe-area-inset-right,0px);
 }
 @media (prefers-color-scheme:dark){:root{--page:#15151c}}   /* color de página (modo oscuro) */
 *{box-sizing:border-box}
-html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-family:"Arial Black",Arial,sans-serif}
+html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-family:"Arial Black",Arial,sans-serif;
+  overscroll-behavior:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}   /* sin rebote, sin zoom por doble toque */
+/* El cuerpo se fija al área visible. 100dvh = alto dinámico: se ajusta cuando la barra
+   del navegador móvil aparece o se oculta (100% queda como respaldo en navegadores viejos). */
+body{position:fixed;left:0;top:0;width:100%;height:100%;height:100dvh}
 
 /* ==========================================================================
    2. FONDO ANIMADO Y CRÉDITO
@@ -107,10 +129,12 @@ html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-famil
 /* Generadores */
 .g{top:553px;width:188px}
 .g svg{display:block;width:100%;height:auto;transform-origin:50% 60%}
+@media (hover:hover){   /* solo dispositivos con ratón: en táctil el hover se quedaba pegado */
 .g:hover{
   transform:scale(1.08);
   filter:drop-shadow(-14px 2px 7px var(--c1)) drop-shadow(-5px 0 7px var(--c2)) drop-shadow(5px 0 7px var(--c3)) drop-shadow(14px 2px 7px var(--c4));
   animation:pulsoGeneradores 1.2s ease-in-out infinite;
+}
 }
 .g:active{transform:scale(.94)}
 .g.go svg{animation:barajar .7s ease}                 /* animación de barajeo al hacer clic */
@@ -131,10 +155,12 @@ html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-famil
 /* Herramientas */
 .t{top:26px;width:68px;height:68px}
 .t svg{display:block;width:100%;height:100%}
+@media (hover:hover){   /* solo dispositivos con ratón: en táctil el hover se quedaba pegado */
 .t:hover{
   transform:scale(1.18);
   filter:drop-shadow(0 0 9px var(--c)) drop-shadow(0 0 3px var(--c));
   animation:pulsoHerramienta 1.2s ease-in-out infinite;
+}
 }
 .t:active{transform:scale(.88)}
 .t.off svg{opacity:.45}                               /* botón de audio silenciado */
@@ -162,9 +188,10 @@ html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-famil
 /* ==========================================================================
    7. VENTANAS EMERGENTES (guía, historial, cierre y resultado de token)
    ========================================================================== */
-#ov{position:fixed;inset:0;background:rgba(3,2,20,.85);display:none;align-items:center;justify-content:center;z-index:9;padding:16px}
+#ov{position:fixed;inset:0;background:rgba(3,2,20,.85);display:none;align-items:center;justify-content:center;z-index:9;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}   /* respeta zonas seguras */
 #ov.on{display:flex}
-#box{background:#070026;color:#fff;border:2px solid #052650;border-radius:20px;max-width:520px;width:100%;max-height:80%;overflow:auto;padding:18px;font-family:Arial,sans-serif;line-height:1.5}
+#box{background:#070026;color:#fff;border:2px solid #052650;border-radius:20px;max-width:520px;width:100%;max-height:100%;overflow:auto;-webkit-overflow-scrolling:touch;padding:18px;font-family:Arial,sans-serif;line-height:1.5}
 #box.w{max-width:820px;background:linear-gradient(160deg,#0d0838,#070026);border:2px solid #002E5C;box-shadow:0 0 40px rgba(0,46,92,.8)}   /* variante ancha (guía e historial) */
 #box h2{margin:0 0 10px;font-family:"Arial Black",Arial}
 #box li{margin:4px 0}
@@ -176,7 +203,7 @@ html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-famil
 .sub{margin:4px 0 6px;opacity:.75;font-size:14px}
 #box h3{margin:20px 0 10px;font:700 13px Arial;letter-spacing:.14em;text-transform:uppercase;color:#FFBF00}
 .rg{display:grid;gap:10px}
-.rg.two{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.rg.two{grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}   /* min(): evita desbordar en pantallas estrechas */
 .rw{display:flex;gap:14px;align-items:center;background:rgba(255,255,255,.05);border-left:4px solid var(--c);border-radius:14px;padding:10px 14px}
 .ri{flex:none}
 .ri svg{display:block;width:100%;height:auto}
@@ -393,7 +420,7 @@ html,body{height:100%;margin:0;background:var(--page);overflow:hidden;font-famil
 <div id="pat"></div>
 
 <!-- Crédito de la aplicación -->
-<div id="credito">Phase Infinity Generator by CHAOS version 1.0</div>
+<div id="credito">Phase Infinity Generator by CHAOS version 1.1</div>
 
 <!-- Iconos de la barra de herramientas (se recortan con <use> desde el diseño "Selector") -->
 <svg width="0" height="0" style="position:absolute"><defs><g id="SEL"><g><g><g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 -2310.71 638.718)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 -1945.4 578.926)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 -1580.09 519.135)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 -1200.04 459.344)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 -464.494 339.761)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 -101.125 279.97)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 269.111 220.178)"></g><g transform="matrix(1.31286 -0.174282 -0.126639 1.01681 635.68 156.742)"></g></g><g><g><polygon class="sfil6" points="6773.34,932.15 4333.42,0 4389.83,0 4481.2,0 4572.6,0 4664.06,0 4700.99,0 6773.34,791.72 "/></g></g><g><path class="sfil13" d="M2288.02 207.11c0,-5.1 4.14,-9.24 9.24,-9.24 5.11,0 9.24,4.14 9.24,9.24l0 56.13c0,5.11 -4.13,9.25 -9.24,9.25l-56.13 0c-5.11,0 -9.24,-4.14 -9.24,-9.25 0,-5.1 4.13,-9.24 9.24,-9.24l37.52 0c-7.11,-10.72 -16.48,-19.52 -27.28,-25.92 -12.78,-7.57 -27.57,-11.77 -42.98,-11.77 -23.28,0 -44.36,9.44 -59.62,24.7 -15.26,15.26 -24.7,36.34 -24.7,59.62 0,23.28 9.44,44.36 24.7,59.62 15.26,15.25 36.34,24.69 59.62,24.69 17.5,0 34.06,-5.37 47.79,-14.82 13.76,-9.46 24.71,-23.01 30.96,-39.34 1.81,-4.76 7.15,-7.16 11.91,-5.34 4.77,1.81 7.16,7.15 5.34,11.91 -7.6,19.88 -20.96,36.39 -37.74,47.93 -16.8,11.57 -37,18.15 -58.26,18.15 -28.38,0 -54.08,-11.51 -72.69,-30.12 -18.6,-18.6 -30.11,-44.3 -30.11,-72.68 0,-28.38 11.51,-54.08 30.11,-72.69 18.61,-18.6 44.31,-30.11 72.69,-30.11 18.74,0 36.76,5.13 52.36,14.37 10.33,6.11 19.58,14.03 27.27,23.45l0 -28.54z"/><path class="sfil14" d="M2614.17 234.74c0,-2.62 -1.07,-4.97 -2.79,-6.69 -1.7,-1.71 -4.07,-2.77 -6.69,-2.77 -43.65,0 -87.32,0 -130.97,0 -2.62,0 -4.98,1.06 -6.69,2.77 -1.72,1.72 -2.78,4.07 -2.78,6.69 0,43.65 0,88.11 0,131.76l-0.03 0c0,2.6 1.07,4.97 2.81,6.7 1.71,1.72 4.07,2.78 6.69,2.78l0 0.03c43.62,0 87.3,-0.03 130.97,-0.03l0 0.03c2.6,0 4.96,-1.08 6.69,-2.81 1.72,-1.71 2.79,-4.08 2.79,-6.7 0,-43.65 0,-88.11 0,-131.76zm-9.48 -27.94c7.73,0 14.72,3.12 19.77,8.19 5.06,5.06 8.2,12.04 8.2,19.75 0,43.65 0,88.11 0,131.76 0,7.73 -3.14,14.71 -8.2,19.77 -5.04,5.05 -12.02,8.15 -19.77,8.15l0 0.04c-43.65,0 -87.32,-0.04 -130.97,-0.04l0 0.04c-7.71,0 -14.7,-3.13 -19.76,-8.19 -5.04,-5.04 -8.15,-12.03 -8.15,-19.77l-0.04 0c0,-43.65 0,-88.11 0,-131.76 0,-7.71 3.14,-14.69 8.19,-19.75 5.06,-5.07 12.05,-8.19 19.76,-8.19 43.65,0 87.32,0 130.97,0zm-117.34 39.52l103.72 0c5.08,0 9.24,4.15 9.24,9.23l0 0.01c0,5.08 -4.16,9.23 -9.24,9.23l-103.72 0c-5.07,0 -9.23,-4.15 -9.23,-9.23l0 -0.01c0,-5.08 4.16,-9.23 9.23,-9.23zm0 45.07l103.72 0c5.08,0 9.24,4.15 9.24,9.23l0 0.01c0,5.08 -4.16,9.23 -9.24,9.23l-103.72 0c-5.07,0 -9.23,-4.15 -9.23,-9.23l0 -0.01c0,-5.08 4.16,-9.23 9.23,-9.23zm0 45.07l103.72 0c5.08,0 9.24,4.15 9.24,9.23l0 0.01c0,5.08 -4.16,9.24 -9.24,9.24l-103.72 0c-5.07,0 -9.23,-4.16 -9.23,-9.24l0 -0.01c0,-5.08 4.16,-9.23 9.23,-9.23z"/><path class="sfil15" d="M4233.52 207.18c5.1,0 9.24,4.14 9.24,9.24 0,5.1 -4.14,9.24 -9.24,9.24l-28.07 0c-2.61,0 -4.98,1.06 -6.7,2.77 -1.71,1.72 -2.77,4.09 -2.77,6.7l0 28.07c0,5.1 -4.14,9.24 -9.24,9.24 -5.1,0 -9.24,-4.14 -9.24,-9.24l0 -28.07c0,-7.72 3.13,-14.71 8.19,-19.76 5.06,-5.06 12.04,-8.19 19.76,-8.19l28.07 0zm130.86 56.02c0,5.1 -4.13,9.24 -9.24,9.24 -5.1,0 -9.24,-4.14 -9.24,-9.24l0 -28.07c0,-2.61 -1.06,-4.98 -2.77,-6.7 -1.72,-1.71 -4.09,-2.77 -6.7,-2.77l-28.07 0c-5.1,0 -9.24,-4.14 -9.24,-9.24 0,-5.1 4.14,-9.24 9.24,-9.24l28.07 0c7.72,0 14.71,3.13 19.76,8.19 5.06,5.06 8.19,12.04 8.19,19.76l0 28.07zm-56.02 130.86c-5.1,0 -9.24,-4.13 -9.24,-9.24 0,-5.1 4.14,-9.24 9.24,-9.24l28.07 0 0 0.04c2.59,0 4.96,-1.08 6.7,-2.81 1.71,-1.72 2.77,-4.09 2.77,-6.7l0 -28.07c0,-5.1 4.14,-9.24 9.24,-9.24 5.11,0 9.24,4.14 9.24,9.24l0 28.07c0,7.72 -3.13,14.71 -8.19,19.76 -5.03,5.04 -12.02,8.16 -19.76,8.16l0 0.03 -28.07 0zm-130.86 -56.02c0,-5.1 4.14,-9.24 9.24,-9.24 5.1,0 9.24,4.14 9.24,9.24l0 28.07 -0.03 0c0,2.59 1.07,4.96 2.8,6.7 1.72,1.71 4.09,2.77 6.7,2.77l0 0.04 28.07 0c5.08,0 9.2,4.12 9.2,9.2 0,5.09 -4.12,9.21 -9.2,9.21l-28.07 0 0 0.03c-7.72,0 -14.7,-3.13 -19.76,-8.19 -5.04,-5.03 -8.16,-12.02 -8.16,-19.76l-0.03 0 0 -28.07z"/><path class="sfil16" d="M3303.35 291.38c-2.14,-19.59 -10.99,-37.16 -24.2,-50.37 -10.51,-10.51 -23.78,-18.26 -38.63,-22.07 5.9,8.84 10.85,18.25 14.78,28.08 5.64,14.1 9.17,29.05 10.4,44.36l37.65 0zm-104.81 -72.44c-14.85,3.81 -28.12,11.56 -38.63,22.07 -13.21,13.21 -22.05,30.78 -24.19,50.37l37.65 0c1.23,-15.31 4.76,-30.26 10.39,-44.35 3.93,-9.83 8.88,-19.25 14.78,-28.09zm-6.69 72.44l55.37 0c-1.19,-12.92 -4.25,-25.54 -9.03,-37.5 -4.64,-11.59 -10.9,-22.55 -18.66,-32.51 -7.75,9.96 -14.02,20.92 -18.66,32.52 -4.77,11.95 -7.83,24.57 -9.02,37.49zm73.85 18.49c-1.23,15.32 -4.76,30.27 -10.4,44.36 -3.93,9.83 -8.88,19.24 -14.78,28.08 14.85,-3.81 28.12,-11.55 38.63,-22.06 13.21,-13.21 22.06,-30.79 24.2,-50.38l-37.65 0zm-67.12 72.45c-5.93,-8.86 -10.89,-18.27 -14.81,-28.09 -5.64,-14.09 -9.17,-29.04 -10.4,-44.36l-37.65 0c2.14,19.59 10.98,37.17 24.19,50.38 10.52,10.51 23.8,18.26 38.67,22.07zm-6.73 -72.45c1.18,12.92 4.25,25.55 9.03,37.5 4.65,11.63 10.91,22.59 18.64,32.53 7.76,-9.97 14.03,-20.93 18.67,-32.53 4.78,-11.95 7.84,-24.58 9.03,-37.5l-55.37 0zm100.37 -81.93c18.61,18.6 30.11,44.3 30.11,72.69 0,28.38 -11.5,54.08 -30.11,72.69 -18.6,18.6 -44.3,30.1 -72.69,30.1 -28.38,0 -54.08,-11.5 -72.69,-30.1 -18.6,-18.61 -30.11,-44.31 -30.11,-72.69 0,-28.39 11.51,-54.09 30.11,-72.69 18.61,-18.61 44.31,-30.11 72.69,-30.11 28.39,0 54.09,11.5 72.69,30.11z"/><path class="sfil17" d="M2856.1 254.3l-31.79 25.44c-1.7,1.36 -3.73,2.01 -5.74,2.01l0 0.05 -28.18 0 0 37.65 28.18 0c2.51,0 4.79,1 6.46,2.63l31.07 24.86 0 -92.64zm78.21 -13.32c-3.59,-3.61 -3.57,-9.45 0.04,-13.03 3.61,-3.59 9.44,-3.58 13.03,0.03 9.61,9.62 17.13,20.98 22.25,33.35 5.13,12.38 7.85,25.73 7.85,39.29 0,13.57 -2.72,26.91 -7.84,39.3 -5.13,12.37 -12.65,23.73 -22.26,33.35 -3.59,3.61 -9.42,3.62 -13.03,0.03 -3.61,-3.59 -3.63,-9.42 -0.04,-13.03 7.92,-7.92 14.1,-17.24 18.29,-27.36 4.18,-10.1 6.4,-21.06 6.4,-32.29 0,-11.22 -2.22,-22.18 -6.41,-32.29 -4.19,-10.11 -10.36,-19.43 -18.28,-27.35zm-33.02 33.02c-3.59,-3.61 -3.58,-9.44 0.03,-13.03 3.61,-3.59 9.45,-3.57 13.03,0.04 5.23,5.23 9.33,11.42 12.12,18.17 2.8,6.76 4.29,14.03 4.29,21.4 0,7.37 -1.49,14.63 -4.29,21.39 -2.79,6.76 -6.89,12.95 -12.11,18.18 -3.59,3.61 -9.43,3.62 -13.04,0.03 -3.61,-3.59 -3.62,-9.42 -0.03,-13.03 3.53,-3.53 6.28,-7.68 8.14,-12.18 1.86,-4.48 2.84,-9.37 2.84,-14.39 0,-5.03 -0.98,-9.91 -2.84,-14.4 -1.86,-4.49 -4.61,-8.64 -8.14,-12.18zm-85.89 -10.68l43.49 -34.79c1.66,-1.63 3.94,-2.64 6.46,-2.64 5.1,0 9.24,4.14 9.24,9.24l0 130.98 -0.05 0c0,2.02 -0.66,4.05 -2.01,5.74 -3.17,3.97 -8.96,4.62 -12.92,1.45l-44.21 -35.37 -34.26 0c-5.1,0 -9.24,-4.13 -9.24,-9.24l0 -56.13c0,-5.11 4.14,-9.24 9.24,-9.24l34.26 0z"/><path class="sfil18" d="M3965.38 287.52c7.72,0 14.71,3.13 19.77,8.19 5.06,5.06 8.19,12.05 8.19,19.76 0,43.65 0,28.7 0,72.35 0,7.73 -3.13,14.71 -8.19,19.77 -5.04,5.04 -12.03,8.16 -19.77,8.16l0 0.03c-43.66,0 -87.33,-0.03 -130.98,-0.03l0 0.03c-7.71,0 -14.7,-3.13 -19.75,-8.19 -5.05,-5.04 -8.16,-12.03 -8.16,-19.77l-0.04 0c0,-43.65 0,-28.7 0,-72.35 0,-7.71 3.14,-14.7 8.2,-19.76 5.05,-5.06 12.04,-8.19 19.75,-8.19 43.65,0 87.32,0 130.98,0zm12.18 -99.32c3.61,-3.61 9.45,-3.61 13.06,0 3.6,3.6 3.61,9.45 0,13.06l-17.29 17.3 36.99 0c7.71,0 14.7,3.13 19.75,8.19 5.06,5.06 8.19,12.04 8.19,19.77 0,40.24 0,80.49 0,120.74 0,5.11 -4.14,9.24 -9.24,9.24l0 0c-5.09,0 -9.24,-4.13 -9.24,-9.24 0,-40.25 0,-80.5 0,-120.74 0,-2.62 -1.06,-4.99 -2.77,-6.7 -1.72,-1.72 -4.07,-2.78 -6.69,-2.78l-36.99 0 17.29 17.29c3.61,3.63 3.61,9.48 0.02,13.09 -3.62,3.62 -9.47,3.6 -13.08,-0.01l-19.86 -19.84c-5.43,-5.46 -8.17,-12.62 -8.17,-19.77 0,-7.14 2.74,-14.3 8.17,-19.76l19.86 -19.84zm-2.7 127.27c0,-2.62 -1.07,-4.98 -2.79,-6.7 -1.7,-1.7 -4.08,-2.77 -6.69,-2.77 -43.66,0 -87.33,0 -130.98,0 -2.62,0 -4.97,1.07 -6.69,2.77 -1.73,1.72 -2.77,4.08 -2.77,6.7 0,43.65 0,28.7 0,72.35l-0.04 0c0,2.6 1.07,4.97 2.81,6.69 1.72,1.72 4.07,2.79 6.69,2.79l0 0.04c43.62,0 87.31,-0.04 130.98,-0.04l0 0.04c2.6,0 4.95,-1.09 6.69,-2.83 1.72,-1.7 2.79,-4.07 2.79,-6.69 0,-43.65 0,-28.7 0,-72.35z"/><path class="sfil19" d="M3648.7 300.64c0,23.28 -9.43,44.36 -24.69,59.6 -15.26,15.27 -36.34,24.71 -59.62,24.71 -23.28,0 -44.36,-9.44 -59.62,-24.71 -15.25,-15.24 -24.7,-36.32 -24.7,-59.6 0,-23.3 9.45,-44.38 24.7,-59.62 15.26,-15.27 36.34,-24.71 59.62,-24.71 23.28,0 44.36,9.44 59.62,24.71 15.26,15.24 24.69,36.32 24.69,59.62zm-101.45 -16.8c1.53,4.84 -1.15,10.04 -5.99,11.57 -4.83,1.53 -10.03,-1.16 -11.56,-5.99 -1.08,-3.41 -1.58,-6.69 -1.58,-9.79 0,-3.36 0.56,-6.68 1.6,-9.84 2.42,-7.44 6.83,-13.1 12.28,-16.99l0.29 -0.2c5.89,-4.13 12.96,-6.15 19.96,-6.28l0.73 -0.05c8.34,0 16.84,2.77 23.33,8 6.8,5.47 11.44,13.59 11.65,23.9l0.05 0.67c0,20.61 -14.42,28.66 -24.36,31.74l0 20.62c0,5.11 -4.15,9.26 -9.26,9.26 -5.11,0 -9.26,-4.15 -9.26,-9.26l0 -27.98c0,-5.11 4.15,-9.26 9.26,-9.26 0.03,0 15.11,-1.01 15.11,-15.12l0 -0.5c-0.09,-4.15 -2,-7.49 -4.75,-9.69 -3.14,-2.51 -7.42,-3.87 -11.77,-3.87l-0.59 0c-3.35,0.02 -6.71,1 -9.43,2.87l-0.26 0.19c-2.35,1.69 -4.33,4.25 -5.43,7.66 -0.4,1.26 -0.64,2.65 -0.64,4.13 0,1.46 0.21,2.89 0.62,4.21zm17.14 64.17c-5.1,0 -9.24,4.15 -9.24,9.24 0,5.11 4.14,9.26 9.24,9.26l0.1 0c5.09,0 9.24,-4.15 9.24,-9.26 0,-5.09 -4.15,-9.24 -9.24,-9.24l-0.1 0zm72.7 25.31c18.6,-18.6 30.11,-44.31 30.11,-72.68 0,-28.39 -11.51,-54.1 -30.11,-72.7 -18.62,-18.6 -44.31,-30.11 -72.7,-30.11 -28.38,0 -54.08,11.51 -72.68,30.11 -18.6,18.6 -30.12,44.31 -30.12,72.7 0,28.37 11.52,54.08 30.12,72.68 18.6,18.6 44.3,30.11 72.68,30.11 28.39,0 54.08,-11.51 72.7,-30.11z"/><path class="sfil20" d="M4522.51 379.42c-4.31,4.31 -11.28,4.3 -15.58,0l0 0c-4.29,-4.29 -4.31,-11.27 0,-15.58l63.21 -63.21 -63.21 -63.21c-4.31,-4.31 -4.3,-11.28 0,-15.58l0 0c4.29,-4.29 11.27,-4.31 15.58,0l63.22 63.21 63.21 -63.21c4.31,-4.32 11.3,-4.29 15.57,0l0 0c4.31,4.29 4.32,11.26 0,15.57l-63.22 63.22 63.22 63.22c4.32,4.31 4.29,11.3 0,15.57l0 0c-4.29,4.31 -11.26,4.32 -15.57,0l-63.21 -63.21 -63.22 63.21z"/></g></g>
@@ -1032,6 +1059,7 @@ let silenciado = false;                         /* true = sin sonido */
 let historial = [];                             /* fases generadas en la partida */
 let faseActual = null;                          /* fase mostrada en el centro */
 let girada = innerHeight > innerWidth;          /* true = pantalla girada 90° (modo vertical) */
+let ultimaVertical = girada;                    /* última orientación detectada del dispositivo */
 let menuIdiomaAbierto = false;
 
 const $ = selector => document.querySelector(selector);     /* atajo para seleccionar elementos */
@@ -1268,11 +1296,31 @@ function accionHerramienta(i) {
   }
 }
 
-/* Escala el escenario para que quepa en la ventana; si está girada, lo rota 90° */
+/* Lee el área realmente visible del dispositivo y sus zonas seguras (muescas, barra de gestos) */
+function medidasVista() {
+  const cuerpo = document.body, estilo = getComputedStyle(document.documentElement);
+  const margen = lado => parseFloat(estilo['padding' + lado]) || 0;
+  return {
+    ancho: cuerpo.clientWidth || innerWidth,               /* el cuerpo mide 100dvh: sigue a la barra del navegador */
+    alto: cuerpo.clientHeight || innerHeight,
+    izq: margen('Left'), der: margen('Right'), sup: margen('Top'), inf: margen('Bottom')
+  };
+}
+
+/* Escala y centra el escenario dentro del área libre; si está girada, lo rota 90°.
+   Además, si el dispositivo cambia de vertical a horizontal (o al revés), la rotación
+   se corrige sola; el botón de orientación sigue sirviendo para forzarla a mano. */
 function ajustarEscala() {
+  const v = medidasVista();
+  const vertical = v.alto > v.ancho;
+  if (vertical !== ultimaVertical) { ultimaVertical = vertical; girada = vertical; }
+  const libreAncho = Math.max(v.ancho - v.izq - v.der, 1), libreAlto = Math.max(v.alto - v.sup - v.inf, 1);
   const ancho = girada ? ESCENARIO_ALTO : ESCENARIO_ANCHO, alto = girada ? ESCENARIO_ANCHO : ESCENARIO_ALTO;
-  const escala = Math.min(innerWidth / ancho, innerHeight / alto) * .98;
-  $('#stage').style.transform = `translate(-50%,-50%) ${girada ? 'rotate(90deg) ' : ''}scale(${escala})`;
+  const escala = Math.min(libreAncho / ancho, libreAlto / alto) * .98;
+  const e = $('#stage').style;
+  e.left = (v.izq + libreAncho / 2) + 'px';                /* centro del área libre */
+  e.top = (v.sup + libreAlto / 2) + 'px';
+  e.transform = `translate(-50%,-50%) ${girada ? 'rotate(90deg) ' : ''}scale(${escala})`;
 }
 
 /* --- Menú desplegable de idiomas --- */
@@ -1428,8 +1476,13 @@ addEventListener('pointerdown', e => {
 /* Tecla Esc: cierra menú y ventana */
 addEventListener('keydown', e => { if (e.key == 'Escape') { cerrarMenuIdioma(); cerrarVentana(); } });
 
-/* Reescalar al cambiar el tamaño de la ventana */
+/* Reescalar al cambiar el tamaño de la ventana, girar el teléfono, entrar o salir de
+   pantalla completa o mostrar/ocultar la barra del navegador. Algunos móviles informan
+   el tamaño nuevo con retraso tras girar, por eso se repite el cálculo un instante después. */
 addEventListener('resize', ajustarEscala);
+addEventListener('orientationchange', () => { ajustarEscala(); setTimeout(ajustarEscala, 250); });
+document.addEventListener('fullscreenchange', () => setTimeout(ajustarEscala, 100));
+if (window.visualViewport) visualViewport.addEventListener('resize', ajustarEscala);
 
 /* Inicio */
 ajustarEscala();
